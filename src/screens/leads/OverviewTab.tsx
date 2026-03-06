@@ -93,7 +93,7 @@ const FUNNEL_SECTIONS: FunnelSectionData[] = [
     color: '#D4AF37',
     colorDark: '#A08620',
     taperTop: 100,
-    taperBot: 80,
+    taperBot: 82,
     metrics: [
       { label: 'Investimento', value: fmtBRL(TOTAIS.inv), highlight: true },
       { label: 'CPL Medio', value: fmtBRL(TOTAIS.inv / TOTAIS.leads) },
@@ -106,8 +106,8 @@ const FUNNEL_SECTIONS: FunnelSectionData[] = [
     label: 'APLICACAO',
     color: '#60A5FA',
     colorDark: '#3B82F6',
-    taperTop: 80,
-    taperBot: 56,
+    taperTop: 82,
+    taperBot: 60,
     metrics: [
       { label: 'Leads', value: String(TOTAIS.leads), highlight: true },
       { label: 'MQL', value: String(TOTAIS.mqls), highlight: true },
@@ -120,8 +120,8 @@ const FUNNEL_SECTIONS: FunnelSectionData[] = [
     label: 'PIPELINE',
     color: '#F97316',
     colorDark: '#C2410C',
-    taperTop: 56,
-    taperBot: 36,
+    taperTop: 60,
+    taperBot: 40,
     metrics: [
       { label: 'Agend. SDR', value: String(TOTAIS.sdrAgend), highlight: true },
       { label: 'Calls Realizadas', value: String(TOTAIS.calls), highlight: true },
@@ -134,8 +134,8 @@ const FUNNEL_SECTIONS: FunnelSectionData[] = [
     label: 'COMERCIAL',
     color: '#22C55E',
     colorDark: '#15803D',
-    taperTop: 36,
-    taperBot: 20,
+    taperTop: 40,
+    taperBot: 28,
     metrics: [
       { label: 'Conversoes', value: String(TOTAIS.vendas), highlight: true },
       { label: 'Faturamento', value: fmtK(TOTAIS.fat), highlight: true },
@@ -145,112 +145,152 @@ const FUNNEL_SECTIONS: FunnelSectionData[] = [
   },
 ];
 
-/* ── Minimal 3D Funnel — muted gold tones ── */
-
-// Muted gold palette for the funnel body (top to bottom, progressively darker)
-const FUNNEL_FILLS = [
-  { base: '#C4A44A', dark: '#8A7530' },
-  { base: '#A8903E', dark: '#746432' },
-  { base: '#8C7C36', dark: '#5E5428' },
-  { base: '#70682E', dark: '#48441E' },
-];
+/* ── 3D SVG Funnel ── */
 
 function SVGFunnel3D() {
   const W = 280;
-  const H = 400;
+  const H = 440;
   const cx = W / 2;
   const sections = FUNNEL_SECTIONS;
-  const gap = 4; // pixel gap between sections
-  const totalGaps = gap * (sections.length - 1);
-  const sectionH = (H - totalGaps) / sections.length;
-  const ery = 0.15; // ellipse y-ratio for 3D depth
+  const sectionH = H / sections.length;
+  const ellipseRatio = 0.18; // how "deep" the 3D ellipses look
 
-  function getR(index: number, pos: 'top' | 'bot') {
-    const pct = pos === 'top' ? sections[index].taperTop : sections[index].taperBot;
-    return (pct / 100) * (W / 2) * 0.88;
+  function getRadiusAtY(index: number, pos: 'top' | 'bot') {
+    const s = sections[index];
+    const pct = pos === 'top' ? s.taperTop : s.taperBot;
+    return (pct / 100) * (W / 2) * 0.92;
   }
 
   return (
-    <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H + 20}`} className="overflow-visible">
+    <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
       <defs>
-        {/* Single specular highlight — shared across all sections */}
-        <linearGradient id="fSpec" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="white" stopOpacity={0} />
-          <stop offset="12%" stopColor="white" stopOpacity={0.14} />
-          <stop offset="30%" stopColor="white" stopOpacity={0.04} />
-          <stop offset="55%" stopColor="white" stopOpacity={0} />
-        </linearGradient>
-        {/* Per-section body gradient */}
-        {FUNNEL_FILLS.map((f, i) => (
-          <linearGradient key={i} id={`fB${i}`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor={f.dark} stopOpacity={0.7} />
-            <stop offset="20%" stopColor={f.base} stopOpacity={0.9} />
-            <stop offset="50%" stopColor={f.base} stopOpacity={0.95} />
-            <stop offset="80%" stopColor={f.base} stopOpacity={0.85} />
-            <stop offset="100%" stopColor={f.dark} stopOpacity={0.55} />
-          </linearGradient>
-        ))}
-        {/* Shadow at bottom */}
-        <radialGradient id="fSh" cx="50%" cy="50%">
-          <stop offset="0%" stopColor="black" stopOpacity={0.2} />
+        {sections.map((s, i) => {
+          const rTop = getRadiusAtY(i, 'top');
+          const rBot = getRadiusAtY(i, 'bot');
+          const avgR = (rTop + rBot) / 2;
+          return (
+            <React.Fragment key={s.id}>
+              {/* Body gradient — cylindrical 3D lighting */}
+              <linearGradient id={`fBody${i}`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor={s.colorDark} stopOpacity={0.6} />
+                <stop offset="15%" stopColor={s.color} stopOpacity={0.95} />
+                <stop offset="40%" stopColor={s.color} stopOpacity={1} />
+                <stop offset="60%" stopColor={s.color} stopOpacity={0.92} />
+                <stop offset="85%" stopColor={s.colorDark} stopOpacity={0.7} />
+                <stop offset="100%" stopColor={s.colorDark} stopOpacity={0.4} />
+              </linearGradient>
+              {/* Specular highlight on left */}
+              <linearGradient id={`fHL${i}`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="white" stopOpacity={0} />
+                <stop offset="10%" stopColor="white" stopOpacity={0.22} />
+                <stop offset="25%" stopColor="white" stopOpacity={0.08} />
+                <stop offset="50%" stopColor="white" stopOpacity={0} />
+              </linearGradient>
+              {/* Top ellipse gradient for 3D rim */}
+              <radialGradient id={`fTop${i}`} cx="40%" cy="40%">
+                <stop offset="0%" stopColor="white" stopOpacity={0.15} />
+                <stop offset="40%" stopColor={s.color} stopOpacity={0.9} />
+                <stop offset="100%" stopColor={s.colorDark} stopOpacity={0.8} />
+              </radialGradient>
+              {/* Glow filter */}
+              <filter id={`fGlow${i}`} x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation={avgR * 0.06} />
+              </filter>
+            </React.Fragment>
+          );
+        })}
+        {/* Global shadow at bottom */}
+        <radialGradient id="fShadow" cx="50%" cy="50%">
+          <stop offset="0%" stopColor="black" stopOpacity={0.3} />
           <stop offset="100%" stopColor="black" stopOpacity={0} />
         </radialGradient>
-        {/* Text legibility */}
-        <filter id="fTx" x="-15%" y="-15%" width="130%" height="130%">
-          <feDropShadow dx="0" dy="1" stdDeviation="1.5" floodColor="black" floodOpacity="0.5" />
+        {/* Text shadow filter */}
+        <filter id="fTextShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="black" floodOpacity="0.6" />
         </filter>
       </defs>
 
-      {/* Ground shadow */}
-      <ellipse cx={cx} cy={H + 8} rx={getR(3, 'bot') * 1.2} ry={8} fill="url(#fSh)" />
+      {/* Bottom shadow ellipse */}
+      <ellipse cx={cx} cy={H + 6} rx={getRadiusAtY(sections.length - 1, 'bot') * 1.3}
+        ry={10} fill="url(#fShadow)" />
 
-      {/* Sections — bottom to top for correct overlap */}
+      {/* Render sections bottom-to-top so upper sections overlap lower */}
       {[...sections].reverse().map((s, ri) => {
         const i = sections.length - 1 - ri;
-        const yTop = i * (sectionH + gap);
-        const yBot = yTop + sectionH;
-        const rT = getR(i, 'top');
-        const rB = getR(i, 'bot');
-        const eyT = rT * ery;
-        const eyB = rB * ery;
+        const yTop = i * sectionH;
+        const yBot = (i + 1) * sectionH;
+        const rTop = getRadiusAtY(i, 'top');
+        const rBot = getRadiusAtY(i, 'bot');
+        const eyTop = rTop * ellipseRatio;
+        const eyBot = rBot * ellipseRatio;
         const isFirst = i === 0;
+        const isLast = i === sections.length - 1;
 
-        const body = `M ${cx - rT} ${yTop} A ${rT} ${eyT} 0 0 1 ${cx + rT} ${yTop} L ${cx + rB} ${yBot} A ${rB} ${eyB} 0 0 1 ${cx - rB} ${yBot} Z`;
+        // Build the funnel body path with elliptical curves
+        const bodyPath = [
+          // Start at top-left
+          `M ${cx - rTop} ${yTop}`,
+          // Top ellipse arc (front half — curves downward)
+          `A ${rTop} ${eyTop} 0 0 1 ${cx + rTop} ${yTop}`,
+          // Right side going down
+          `L ${cx + rBot} ${yBot}`,
+          // Bottom ellipse arc (front half — curves downward)
+          `A ${rBot} ${eyBot} 0 0 1 ${cx - rBot} ${yBot}`,
+          // Left side going up
+          `Z`,
+        ].join(' ');
 
         return (
           <g key={s.id}>
-            {/* Body fill */}
-            <path d={body} fill={`url(#fB${i})`} />
-            {/* Specular */}
-            <path d={body} fill="url(#fSpec)" />
+            {/* Ambient glow behind section */}
+            <ellipse cx={cx} cy={(yTop + yBot) / 2}
+              rx={(rTop + rBot) / 2 * 1.15} ry={sectionH * 0.3}
+              fill={s.color} opacity={0.06}
+              filter={`url(#fGlow${i})`} />
 
-            {/* Top rim (first section only) */}
+            {/* Main body */}
+            <path d={bodyPath} fill={`url(#fBody${i})`} />
+
+            {/* Specular highlight overlay */}
+            <path d={bodyPath} fill={`url(#fHL${i})`} />
+
+            {/* Top rim ellipse (only visible on first section or between sections) */}
+            {isFirst && (
+              <ellipse cx={cx} cy={yTop} rx={rTop} ry={eyTop}
+                fill={`url(#fTop${i})`}
+                stroke={s.color} strokeWidth={0.5} strokeOpacity={0.4} />
+            )}
+
+            {/* Bottom rim ellipse — gives depth between sections */}
+            <ellipse cx={cx} cy={yBot} rx={rBot} ry={eyBot}
+              fill={s.colorDark} opacity={0.5} />
+
+            {/* Inner opening + bright rim at top */}
             {isFirst && (
               <>
-                <ellipse cx={cx} cy={yTop} rx={rT} ry={eyT}
-                  fill={FUNNEL_FILLS[0].base} fillOpacity={0.7}
-                  stroke="white" strokeWidth={0.6} strokeOpacity={0.1} />
-                <ellipse cx={cx} cy={yTop} rx={rT * 0.82} ry={eyT * 0.65}
-                  fill="var(--bg-primary)" opacity={0.5} />
+                {/* Dark interior visible through the opening */}
+                <ellipse cx={cx} cy={yTop} rx={rTop * 0.85} ry={eyTop * 0.7}
+                  fill="var(--bg-primary)" opacity={0.6} />
+                {/* Bright rim highlight */}
+                <ellipse cx={cx} cy={yTop} rx={rTop - 0.5} ry={eyTop - 0.3}
+                  fill="none" stroke="white" strokeWidth={1} strokeOpacity={0.15} />
               </>
             )}
 
-            {/* Bottom rim — separator between sections */}
-            <ellipse cx={cx} cy={yBot} rx={rB} ry={eyB}
-              fill={FUNNEL_FILLS[i].dark} fillOpacity={0.6} />
-
             {/* Section label */}
-            <text x={cx} y={(yTop + yBot) / 2 + 1}
+            <text x={cx} y={(yTop + yBot) / 2 + 2}
               textAnchor="middle" dominantBaseline="middle"
-              fill="white" fillOpacity={0.9} fontSize={11} fontWeight={700}
-              fontFamily="'DM Sans'" letterSpacing="2.5"
-              filter="url(#fTx)">
+              fill="white" fontSize={12} fontWeight={800}
+              fontFamily="'DM Sans'" letterSpacing="2"
+              filter="url(#fTextShadow)">
               {s.label}
             </text>
 
-            {/* Accent dot — subtle color identity */}
-            <circle cx={cx} cy={yBot - 8} r={3}
-              fill={s.color} opacity={0.5} />
+            {/* Inner rim between sections for depth */}
+            {!isLast && (
+              <ellipse cx={cx} cy={yBot} rx={rBot - 2} ry={eyBot - 0.5}
+                fill="none" stroke="white" strokeWidth={0.5} strokeOpacity={0.06} />
+            )}
           </g>
         );
       })}
@@ -264,28 +304,22 @@ function FunnelDataPanel({ section }: { section: FunnelSectionData }) {
     <div
       className="flex-1 min-h-[80px] rounded-xl p-3 md:p-4 flex items-center transition-all duration-300"
       style={{
-        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 6%, var(--bg-card)), color-mix(in srgb, ${color} 2%, var(--bg-primary)))`,
-        border: `1px solid color-mix(in srgb, ${color} 12%, transparent)`,
+        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 8%, var(--bg-card)), color-mix(in srgb, ${color} 3%, var(--bg-primary)))`,
+        border: `1px solid color-mix(in srgb, ${color} 18%, transparent)`,
       }}
     >
-      <div className="w-full">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-          <span className="text-[9px] font-bold uppercase tracking-[2px] text-text-muted">{section.label}</span>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-2">
-          {metrics.map((m) => (
-            <div key={m.label}>
-              <p className="text-[9px] md:text-[10px] text-text-muted uppercase tracking-wider">{m.label}</p>
-              <p className={cn(
-                'text-[16px] md:text-[20px] font-extrabold',
-                m.highlight ? 'text-text-primary' : 'text-text-secondary'
-              )}>
-                {m.value}
-              </p>
-            </div>
-          ))}
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-2 w-full">
+        {metrics.map((m) => (
+          <div key={m.label}>
+            <p className="text-[9px] md:text-[10px] text-text-muted uppercase tracking-wider">{m.label}</p>
+            <p className={cn(
+              'text-[16px] md:text-[20px] font-extrabold',
+              m.highlight ? 'text-text-primary' : 'text-text-secondary'
+            )}>
+              {m.value}
+            </p>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -327,7 +361,7 @@ export function OverviewTab() {
         {/* Desktop: 3D funnel left, data panels right */}
         <div className="hidden lg:grid lg:grid-cols-[300px_1fr] gap-5">
           {/* 3D Funnel column */}
-          <div className="dash-card p-5 pb-8 relative" style={{ minHeight: 440 }}>
+          <div className="dash-hero p-5 pb-8 relative" style={{ minHeight: 480 }}>
             <SVGFunnel3D />
           </div>
           {/* Data panels column */}
