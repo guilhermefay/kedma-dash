@@ -1,4 +1,3 @@
-import React from 'react';
 import { cn } from '../../lib/utils';
 import {
   FAROIS, TOTAIS, META_MES, DIAS_PASSADOS, DIAS_MES,
@@ -73,44 +72,47 @@ function Gauge({ label, valor, meta, unidade, desc }: Farol) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FUNNEL SECTION — 3D SVG Conical Funnel + Data Panels
+   FUNNEL — Clean flat design with tapered bars + integrated metrics
    ═══════════════════════════════════════════════════════════════════════════ */
 
 interface FunnelSectionData {
   id: string;
   label: string;
+  sublabel: string;
   color: string;
-  colorDark: string;
-  metrics: { label: string; value: string; highlight?: boolean }[];
-  taperTop: number; // % width at top
-  taperBot: number; // % width at bottom
+  colorMuted: string;
+  width: number; // % width (100 = full)
+  mainValue: string;
+  mainLabel: string;
+  metrics: { label: string; value: string }[];
 }
 
 const FUNNEL_SECTIONS: FunnelSectionData[] = [
   {
     id: 'anuncios',
     label: 'ANUNCIOS',
+    sublabel: 'Trafego Pago',
     color: '#D4AF37',
-    colorDark: '#A08620',
-    taperTop: 100,
-    taperBot: 82,
+    colorMuted: 'rgba(212,175,55,0.12)',
+    width: 100,
+    mainValue: fmtBRL(TOTAIS.inv),
+    mainLabel: 'Investido',
     metrics: [
-      { label: 'Investimento', value: fmtBRL(TOTAIS.inv), highlight: true },
-      { label: 'CPL Medio', value: fmtBRL(TOTAIS.inv / TOTAIS.leads) },
       { label: 'Meta Inv.', value: fmtK(META_MES.investimento) },
-      { label: '% Budget', value: `${((TOTAIS.inv / META_MES.investimento) * 100).toFixed(1)}%` },
+      { label: 'Budget', value: `${((TOTAIS.inv / META_MES.investimento) * 100).toFixed(1)}%` },
+      { label: 'CPL', value: fmtBRL(TOTAIS.inv / TOTAIS.leads) },
     ],
   },
   {
     id: 'aplicacao',
-    label: 'APLICACAO',
+    label: 'LEADS & MQL',
+    sublabel: 'Qualificacao',
     color: '#60A5FA',
-    colorDark: '#3B82F6',
-    taperTop: 82,
-    taperBot: 60,
+    colorMuted: 'rgba(96,165,250,0.12)',
+    width: 76,
+    mainValue: `${TOTAIS.leads} → ${TOTAIS.mqls}`,
+    mainLabel: 'Leads → MQL',
     metrics: [
-      { label: 'Leads', value: String(TOTAIS.leads), highlight: true },
-      { label: 'MQL', value: String(TOTAIS.mqls), highlight: true },
       { label: '% MQL', value: `${(TOTAIS.pctMql * 100).toFixed(1)}%` },
       { label: 'CPMQL', value: fmtBRL(TOTAIS.inv / TOTAIS.mqls) },
     ],
@@ -118,212 +120,33 @@ const FUNNEL_SECTIONS: FunnelSectionData[] = [
   {
     id: 'pipeline',
     label: 'PIPELINE',
+    sublabel: 'Agendamento & Calls',
     color: '#F97316',
-    colorDark: '#C2410C',
-    taperTop: 60,
-    taperBot: 40,
+    colorMuted: 'rgba(249,115,22,0.12)',
+    width: 52,
+    mainValue: `${TOTAIS.sdrAgend} → ${TOTAIS.calls}`,
+    mainLabel: 'Agend. → Calls',
     metrics: [
-      { label: 'Agend. SDR', value: String(TOTAIS.sdrAgend), highlight: true },
-      { label: 'Calls Realizadas', value: String(TOTAIS.calls), highlight: true },
-      { label: 'Show Rate', value: '87,2%' },
-      { label: 'No Show', value: String(TOTAIS.sdrAgend - TOTAIS.calls) },
+      { label: 'Show Rate', value: `${(TOTAIS.calls / TOTAIS.agendNoDia * 100).toFixed(1)}%` },
+      { label: 'No Show', value: String(TOTAIS.agendNoDia - TOTAIS.calls) },
     ],
   },
   {
     id: 'comercial',
     label: 'COMERCIAL',
+    sublabel: 'Fechamento',
     color: '#22C55E',
-    colorDark: '#15803D',
-    taperTop: 40,
-    taperBot: 28,
+    colorMuted: 'rgba(34,197,94,0.12)',
+    width: 34,
+    mainValue: String(TOTAIS.vendas),
+    mainLabel: 'Vendas',
     metrics: [
-      { label: 'Conversoes', value: String(TOTAIS.vendas), highlight: true },
-      { label: 'Faturamento', value: fmtK(TOTAIS.fat), highlight: true },
+      { label: 'Fat.', value: fmtK(TOTAIS.fat) },
       { label: 'ROAS', value: `${TOTAIS.roas.toFixed(2)}x` },
       { label: 'CPA', value: fmtBRL(TOTAIS.cpa) },
     ],
   },
 ];
-
-/* ── 3D SVG Funnel ── */
-
-function SVGFunnel3D() {
-  const W = 280;
-  const H = 440;
-  const cx = W / 2;
-  const sections = FUNNEL_SECTIONS;
-  const sectionH = H / sections.length;
-  const ellipseRatio = 0.18; // how "deep" the 3D ellipses look
-
-  function getRadiusAtY(index: number, pos: 'top' | 'bot') {
-    const s = sections[index];
-    const pct = pos === 'top' ? s.taperTop : s.taperBot;
-    return (pct / 100) * (W / 2) * 0.92;
-  }
-
-  return (
-    <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
-      <defs>
-        {sections.map((s, i) => {
-          const rTop = getRadiusAtY(i, 'top');
-          const rBot = getRadiusAtY(i, 'bot');
-          const avgR = (rTop + rBot) / 2;
-          return (
-            <React.Fragment key={s.id}>
-              {/* Body gradient — cylindrical 3D lighting */}
-              <linearGradient id={`fBody${i}`} x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor={s.colorDark} stopOpacity={0.6} />
-                <stop offset="15%" stopColor={s.color} stopOpacity={0.95} />
-                <stop offset="40%" stopColor={s.color} stopOpacity={1} />
-                <stop offset="60%" stopColor={s.color} stopOpacity={0.92} />
-                <stop offset="85%" stopColor={s.colorDark} stopOpacity={0.7} />
-                <stop offset="100%" stopColor={s.colorDark} stopOpacity={0.4} />
-              </linearGradient>
-              {/* Specular highlight on left */}
-              <linearGradient id={`fHL${i}`} x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="white" stopOpacity={0} />
-                <stop offset="10%" stopColor="white" stopOpacity={0.22} />
-                <stop offset="25%" stopColor="white" stopOpacity={0.08} />
-                <stop offset="50%" stopColor="white" stopOpacity={0} />
-              </linearGradient>
-              {/* Top ellipse gradient for 3D rim */}
-              <radialGradient id={`fTop${i}`} cx="40%" cy="40%">
-                <stop offset="0%" stopColor="white" stopOpacity={0.15} />
-                <stop offset="40%" stopColor={s.color} stopOpacity={0.9} />
-                <stop offset="100%" stopColor={s.colorDark} stopOpacity={0.8} />
-              </radialGradient>
-              {/* Glow filter */}
-              <filter id={`fGlow${i}`} x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation={avgR * 0.06} />
-              </filter>
-            </React.Fragment>
-          );
-        })}
-        {/* Global shadow at bottom */}
-        <radialGradient id="fShadow" cx="50%" cy="50%">
-          <stop offset="0%" stopColor="black" stopOpacity={0.3} />
-          <stop offset="100%" stopColor="black" stopOpacity={0} />
-        </radialGradient>
-        {/* Text shadow filter */}
-        <filter id="fTextShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="black" floodOpacity="0.6" />
-        </filter>
-      </defs>
-
-      {/* Bottom shadow ellipse */}
-      <ellipse cx={cx} cy={H + 6} rx={getRadiusAtY(sections.length - 1, 'bot') * 1.3}
-        ry={10} fill="url(#fShadow)" />
-
-      {/* Render sections bottom-to-top so upper sections overlap lower */}
-      {[...sections].reverse().map((s, ri) => {
-        const i = sections.length - 1 - ri;
-        const yTop = i * sectionH;
-        const yBot = (i + 1) * sectionH;
-        const rTop = getRadiusAtY(i, 'top');
-        const rBot = getRadiusAtY(i, 'bot');
-        const eyTop = rTop * ellipseRatio;
-        const eyBot = rBot * ellipseRatio;
-        const isFirst = i === 0;
-        const isLast = i === sections.length - 1;
-
-        // Build the funnel body path with elliptical curves
-        const bodyPath = [
-          // Start at top-left
-          `M ${cx - rTop} ${yTop}`,
-          // Top ellipse arc (front half — curves downward)
-          `A ${rTop} ${eyTop} 0 0 1 ${cx + rTop} ${yTop}`,
-          // Right side going down
-          `L ${cx + rBot} ${yBot}`,
-          // Bottom ellipse arc (front half — curves downward)
-          `A ${rBot} ${eyBot} 0 0 1 ${cx - rBot} ${yBot}`,
-          // Left side going up
-          `Z`,
-        ].join(' ');
-
-        return (
-          <g key={s.id}>
-            {/* Ambient glow behind section */}
-            <ellipse cx={cx} cy={(yTop + yBot) / 2}
-              rx={(rTop + rBot) / 2 * 1.15} ry={sectionH * 0.3}
-              fill={s.color} opacity={0.06}
-              filter={`url(#fGlow${i})`} />
-
-            {/* Main body */}
-            <path d={bodyPath} fill={`url(#fBody${i})`} />
-
-            {/* Specular highlight overlay */}
-            <path d={bodyPath} fill={`url(#fHL${i})`} />
-
-            {/* Top rim ellipse (only visible on first section or between sections) */}
-            {isFirst && (
-              <ellipse cx={cx} cy={yTop} rx={rTop} ry={eyTop}
-                fill={`url(#fTop${i})`}
-                stroke={s.color} strokeWidth={0.5} strokeOpacity={0.4} />
-            )}
-
-            {/* Bottom rim ellipse — gives depth between sections */}
-            <ellipse cx={cx} cy={yBot} rx={rBot} ry={eyBot}
-              fill={s.colorDark} opacity={0.5} />
-
-            {/* Inner opening + bright rim at top */}
-            {isFirst && (
-              <>
-                {/* Dark interior visible through the opening */}
-                <ellipse cx={cx} cy={yTop} rx={rTop * 0.85} ry={eyTop * 0.7}
-                  fill="var(--bg-primary)" opacity={0.6} />
-                {/* Bright rim highlight */}
-                <ellipse cx={cx} cy={yTop} rx={rTop - 0.5} ry={eyTop - 0.3}
-                  fill="none" stroke="white" strokeWidth={1} strokeOpacity={0.15} />
-              </>
-            )}
-
-            {/* Section label */}
-            <text x={cx} y={(yTop + yBot) / 2 + 2}
-              textAnchor="middle" dominantBaseline="middle"
-              fill="white" fontSize={12} fontWeight={800}
-              fontFamily="'DM Sans'" letterSpacing="2"
-              filter="url(#fTextShadow)">
-              {s.label}
-            </text>
-
-            {/* Inner rim between sections for depth */}
-            {!isLast && (
-              <ellipse cx={cx} cy={yBot} rx={rBot - 2} ry={eyBot - 0.5}
-                fill="none" stroke="white" strokeWidth={0.5} strokeOpacity={0.06} />
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function FunnelDataPanel({ section }: { section: FunnelSectionData }) {
-  const { color, metrics } = section;
-  return (
-    <div
-      className="flex-1 min-h-[80px] rounded-xl p-3 md:p-4 flex items-center transition-all duration-300"
-      style={{
-        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 8%, var(--bg-card)), color-mix(in srgb, ${color} 3%, var(--bg-primary)))`,
-        border: `1px solid color-mix(in srgb, ${color} 18%, transparent)`,
-      }}
-    >
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-2 w-full">
-        {metrics.map((m) => (
-          <div key={m.label}>
-            <p className="text-[9px] md:text-[10px] text-text-muted uppercase tracking-wider">{m.label}</p>
-            <p className={cn(
-              'text-[16px] md:text-[20px] font-extrabold',
-              m.highlight ? 'text-text-primary' : 'text-text-secondary'
-            )}>
-              {m.value}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DAILY MINI CHART
@@ -358,38 +181,60 @@ export function OverviewTab() {
       <section>
         <SectionHeader title="Funil de Performance" subtitle="Visao completa: investimento ao faturamento" accent="info" />
 
-        {/* Desktop: 3D funnel left, data panels right */}
-        <div className="hidden lg:grid lg:grid-cols-[300px_1fr] gap-5">
-          {/* 3D Funnel column */}
-          <div className="dash-hero p-5 pb-8 relative" style={{ minHeight: 480 }}>
-            <SVGFunnel3D />
-          </div>
-          {/* Data panels column */}
-          <div className="flex flex-col gap-3">
-            {FUNNEL_SECTIONS.map((s) => (
-              <FunnelDataPanel key={s.id} section={s} />
-            ))}
-          </div>
-        </div>
+        <div className="dash-card p-5 md:p-8 space-y-1">
+          {FUNNEL_SECTIONS.map((s, i) => (
+            <div key={s.id}>
+              {/* Funnel bar — centered, width tapers */}
+              <div className="flex flex-col items-center">
+                <div
+                  className="relative rounded-lg overflow-hidden transition-all duration-500"
+                  style={{
+                    width: `${s.width}%`,
+                    minHeight: 72,
+                    background: `linear-gradient(135deg, ${s.colorMuted}, color-mix(in srgb, ${s.color} 6%, var(--bg-card)))`,
+                    border: `1px solid color-mix(in srgb, ${s.color} 20%, transparent)`,
+                  }}
+                >
+                  {/* Top accent line */}
+                  <div
+                    className="absolute top-0 left-0 right-0 h-[2px]"
+                    style={{ background: `linear-gradient(90deg, transparent, ${s.color}, transparent)` }}
+                  />
 
-        {/* Mobile/Tablet: stacked cards with funnel color accent */}
-        <div className="lg:hidden space-y-3">
-          {FUNNEL_SECTIONS.map((s) => (
-            <div key={s.id} className="dash-card overflow-visible" style={{ borderLeftWidth: 3, borderLeftColor: s.color }}>
-              <div className="p-4">
-                <p className="text-[11px] font-extrabold uppercase tracking-[2px] mb-3" style={{ color: s.color }}>
-                  {s.label.replace('\n', ' ')}
-                </p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  {s.metrics.map((m) => (
-                    <div key={m.label}>
-                      <p className="text-[9px] text-text-muted uppercase tracking-wider">{m.label}</p>
-                      <p className={cn('text-[18px] font-extrabold', m.highlight ? 'text-text-primary' : 'text-text-secondary')}>
-                        {m.value}
+                  {/* Content */}
+                  <div className="relative z-10 px-4 md:px-5 py-3 flex items-center gap-4 md:gap-6">
+                    {/* Left: label + main value */}
+                    <div className="flex-shrink-0 min-w-0">
+                      <p className="text-[9px] font-bold uppercase tracking-[2px] mb-0.5" style={{ color: s.color }}>
+                        {s.label}
                       </p>
+                      <p className="text-[20px] md:text-[24px] font-extrabold text-text-primary leading-none tracking-tight">
+                        {s.mainValue}
+                      </p>
+                      <p className="text-[9px] text-text-muted mt-0.5">{s.mainLabel}</p>
                     </div>
-                  ))}
+
+                    {/* Right: secondary metrics */}
+                    <div className="flex-1 flex flex-wrap items-center justify-end gap-x-4 md:gap-x-6 gap-y-1">
+                      {s.metrics.map((m) => (
+                        <div key={m.label} className="text-right">
+                          <p className="text-[8px] md:text-[9px] text-text-muted uppercase tracking-wider">{m.label}</p>
+                          <p className="text-[13px] md:text-[15px] font-bold text-text-secondary">{m.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+
+                {/* Connector arrow between sections */}
+                {i < FUNNEL_SECTIONS.length - 1 && (
+                  <div className="flex flex-col items-center py-1">
+                    <div className="w-px h-2" style={{ backgroundColor: `color-mix(in srgb, ${s.color} 30%, transparent)` }} />
+                    <svg width="8" height="5" viewBox="0 0 8 5">
+                      <path d="M0 0 L4 5 L8 0" fill={`color-mix(in srgb, ${s.color} 30%, transparent)`} />
+                    </svg>
+                  </div>
+                )}
               </div>
             </div>
           ))}
