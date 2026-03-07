@@ -72,47 +72,44 @@ function Gauge({ label, valor, meta, unidade, desc }: Farol) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   FUNNEL — Clean flat design with tapered bars + integrated metrics
+   FUNNEL — Flat SVG lateral funnel + side data panels
    ═══════════════════════════════════════════════════════════════════════════ */
 
 interface FunnelSectionData {
   id: string;
   label: string;
-  sublabel: string;
   color: string;
-  colorMuted: string;
-  width: number; // % width (100 = full)
-  mainValue: string;
-  mainLabel: string;
-  metrics: { label: string; value: string }[];
+  colorDark: string;
+  widthTop: number; // % width at top of section
+  widthBot: number; // % width at bottom
+  metrics: { label: string; value: string; highlight?: boolean }[];
 }
 
 const FUNNEL_SECTIONS: FunnelSectionData[] = [
   {
     id: 'anuncios',
     label: 'ANUNCIOS',
-    sublabel: 'Trafego Pago',
     color: '#D4AF37',
-    colorMuted: 'rgba(212,175,55,0.12)',
-    width: 100,
-    mainValue: fmtBRL(TOTAIS.inv),
-    mainLabel: 'Investido',
+    colorDark: '#B8962E',
+    widthTop: 100,
+    widthBot: 78,
     metrics: [
+      { label: 'Investimento', value: fmtBRL(TOTAIS.inv), highlight: true },
+      { label: 'CPL Medio', value: fmtBRL(TOTAIS.inv / TOTAIS.leads) },
       { label: 'Meta Inv.', value: fmtK(META_MES.investimento) },
-      { label: 'Budget', value: `${((TOTAIS.inv / META_MES.investimento) * 100).toFixed(1)}%` },
-      { label: 'CPL', value: fmtBRL(TOTAIS.inv / TOTAIS.leads) },
+      { label: '% Budget', value: `${((TOTAIS.inv / META_MES.investimento) * 100).toFixed(1)}%` },
     ],
   },
   {
     id: 'aplicacao',
-    label: 'LEADS & MQL',
-    sublabel: 'Qualificacao',
+    label: 'APLICACAO',
     color: '#60A5FA',
-    colorMuted: 'rgba(96,165,250,0.12)',
-    width: 76,
-    mainValue: `${TOTAIS.leads} → ${TOTAIS.mqls}`,
-    mainLabel: 'Leads → MQL',
+    colorDark: '#4B8FDE',
+    widthTop: 78,
+    widthBot: 54,
     metrics: [
+      { label: 'Leads', value: String(TOTAIS.leads), highlight: true },
+      { label: 'MQL', value: String(TOTAIS.mqls), highlight: true },
       { label: '% MQL', value: `${(TOTAIS.pctMql * 100).toFixed(1)}%` },
       { label: 'CPMQL', value: fmtBRL(TOTAIS.inv / TOTAIS.mqls) },
     ],
@@ -120,13 +117,13 @@ const FUNNEL_SECTIONS: FunnelSectionData[] = [
   {
     id: 'pipeline',
     label: 'PIPELINE',
-    sublabel: 'Agendamento & Calls',
     color: '#F97316',
-    colorMuted: 'rgba(249,115,22,0.12)',
-    width: 52,
-    mainValue: `${TOTAIS.sdrAgend} → ${TOTAIS.calls}`,
-    mainLabel: 'Agend. → Calls',
+    colorDark: '#DC6512',
+    widthTop: 54,
+    widthBot: 36,
     metrics: [
+      { label: 'Agend. SDR', value: String(TOTAIS.sdrAgend), highlight: true },
+      { label: 'Calls', value: String(TOTAIS.calls), highlight: true },
       { label: 'Show Rate', value: `${(TOTAIS.calls / TOTAIS.agendNoDia * 100).toFixed(1)}%` },
       { label: 'No Show', value: String(TOTAIS.agendNoDia - TOTAIS.calls) },
     ],
@@ -134,19 +131,162 @@ const FUNNEL_SECTIONS: FunnelSectionData[] = [
   {
     id: 'comercial',
     label: 'COMERCIAL',
-    sublabel: 'Fechamento',
     color: '#22C55E',
-    colorMuted: 'rgba(34,197,94,0.12)',
-    width: 34,
-    mainValue: String(TOTAIS.vendas),
-    mainLabel: 'Vendas',
+    colorDark: '#1AA34D',
+    widthTop: 36,
+    widthBot: 22,
     metrics: [
-      { label: 'Fat.', value: fmtK(TOTAIS.fat) },
+      { label: 'Conversoes', value: String(TOTAIS.vendas), highlight: true },
+      { label: 'Faturamento', value: fmtK(TOTAIS.fat), highlight: true },
       { label: 'ROAS', value: `${TOTAIS.roas.toFixed(2)}x` },
       { label: 'CPA', value: fmtBRL(TOTAIS.cpa) },
     ],
   },
 ];
+
+/* ── Flat SVG Funnel (sidebar visual) ── */
+
+function FunnelSVG() {
+  const W = 260;
+  const gap = 6;
+  const sectionH = 90;
+  const H = FUNNEL_SECTIONS.length * sectionH + (FUNNEL_SECTIONS.length - 1) * gap;
+  const cx = W / 2;
+  const r = 8; // corner radius
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block">
+      <defs>
+        {FUNNEL_SECTIONS.map((s, i) => (
+          <linearGradient key={s.id} id={`fg${i}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={s.color} stopOpacity={0.85} />
+            <stop offset="100%" stopColor={s.colorDark} stopOpacity={0.7} />
+          </linearGradient>
+        ))}
+      </defs>
+
+      {FUNNEL_SECTIONS.map((s, i) => {
+        const y = i * (sectionH + gap);
+        const wTop = (s.widthTop / 100) * W;
+        const wBot = (s.widthBot / 100) * W;
+        const xTL = cx - wTop / 2;
+        const xTR = cx + wTop / 2;
+        const xBL = cx - wBot / 2;
+        const xBR = cx + wBot / 2;
+
+        // Trapezoid path with rounded top corners
+        const isFirst = i === 0;
+        const isLast = i === FUNNEL_SECTIONS.length - 1;
+        const rT = isFirst ? r : 4;
+        const rB = isLast ? r : 2;
+
+        const path = [
+          `M ${xTL + rT} ${y}`,
+          `L ${xTR - rT} ${y}`,
+          `Q ${xTR} ${y} ${xTR} ${y + rT}`,
+          `L ${xBR} ${y + sectionH - rB}`,
+          `Q ${xBR} ${y + sectionH} ${xBR - rB} ${y + sectionH}`,
+          `L ${xBL + rB} ${y + sectionH}`,
+          `Q ${xBL} ${y + sectionH} ${xBL} ${y + sectionH - rB}`,
+          `L ${xTL} ${y + rT}`,
+          `Q ${xTL} ${y} ${xTL + rT} ${y}`,
+          'Z',
+        ].join(' ');
+
+        return (
+          <g key={s.id}>
+            {/* Main shape */}
+            <path d={path} fill={`url(#fg${i})`} />
+
+            {/* Top shine line */}
+            {isFirst && (
+              <line
+                x1={xTL + rT + 4} y1={y + 1} x2={xTR - rT - 4} y2={y + 1}
+                stroke="white" strokeWidth={1} strokeOpacity={0.15} strokeLinecap="round"
+              />
+            )}
+
+            {/* Left edge highlight */}
+            <line
+              x1={xTL + (isFirst ? 1 : 0)} y1={y + rT} x2={xBL + 1} y2={y + sectionH - rB}
+              stroke="white" strokeWidth={0.8} strokeOpacity={0.08}
+            />
+
+            {/* Section label */}
+            <text
+              x={cx} y={y + sectionH / 2 - 6}
+              textAnchor="middle" dominantBaseline="middle"
+              fill="white" fillOpacity={0.95} fontSize={11} fontWeight={800}
+              fontFamily="'DM Sans'" letterSpacing="2.5"
+            >
+              {s.label}
+            </text>
+
+            {/* Conversion rate between this and next */}
+            {!isLast && (() => {
+              const rates = ['63%', '29%', '51%'];
+              return (
+                <text
+                  x={cx} y={y + sectionH / 2 + 12}
+                  textAnchor="middle" dominantBaseline="middle"
+                  fill="white" fillOpacity={0.4} fontSize={9} fontWeight={600}
+                  fontFamily="'DM Sans'"
+                >
+                  ↓ {rates[i]}
+                </text>
+              );
+            })()}
+
+            {/* Bottom value for last section */}
+            {isLast && (
+              <text
+                x={cx} y={y + sectionH / 2 + 12}
+                textAnchor="middle" dominantBaseline="middle"
+                fill="white" fillOpacity={0.5} fontSize={9} fontWeight={600}
+                fontFamily="'DM Sans'"
+              >
+                {TOTAIS.vendas} vendas
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function FunnelDataPanel({ section }: { section: FunnelSectionData }) {
+  const { color, metrics } = section;
+  return (
+    <div
+      className="flex-1 min-h-[80px] rounded-xl p-3 md:p-4 flex items-center transition-all duration-300"
+      style={{
+        background: `linear-gradient(135deg, color-mix(in srgb, ${color} 8%, var(--bg-card)), color-mix(in srgb, ${color} 3%, var(--bg-primary)))`,
+        border: `1px solid color-mix(in srgb, ${color} 15%, transparent)`,
+      }}
+    >
+      <div className="w-full">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+          <span className="text-[9px] font-bold uppercase tracking-[2px] text-text-muted">{section.label}</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-2">
+          {metrics.map((m) => (
+            <div key={m.label}>
+              <p className="text-[9px] md:text-[10px] text-text-muted uppercase tracking-wider">{m.label}</p>
+              <p className={cn(
+                'text-[16px] md:text-[20px] font-extrabold',
+                m.highlight ? 'text-text-primary' : 'text-text-secondary'
+              )}>
+                {m.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DAILY MINI CHART
@@ -181,60 +321,36 @@ export function OverviewTab() {
       <section>
         <SectionHeader title="Funil de Performance" subtitle="Visao completa: investimento ao faturamento" accent="info" />
 
-        <div className="dash-card p-5 md:p-8 space-y-1">
-          {FUNNEL_SECTIONS.map((s, i) => (
-            <div key={s.id}>
-              {/* Funnel bar — centered, width tapers */}
-              <div className="flex flex-col items-center">
-                <div
-                  className="relative rounded-lg overflow-hidden transition-all duration-500"
-                  style={{
-                    width: `${s.width}%`,
-                    minHeight: 72,
-                    background: `linear-gradient(135deg, ${s.colorMuted}, color-mix(in srgb, ${s.color} 6%, var(--bg-card)))`,
-                    border: `1px solid color-mix(in srgb, ${s.color} 20%, transparent)`,
-                  }}
-                >
-                  {/* Top accent line */}
-                  <div
-                    className="absolute top-0 left-0 right-0 h-[2px]"
-                    style={{ background: `linear-gradient(90deg, transparent, ${s.color}, transparent)` }}
-                  />
+        {/* Desktop: SVG funnel left, data panels right */}
+        <div className="hidden lg:grid lg:grid-cols-[280px_1fr] gap-4">
+          <div className="dash-card p-5 flex items-center justify-center">
+            <FunnelSVG />
+          </div>
+          <div className="flex flex-col gap-3">
+            {FUNNEL_SECTIONS.map((s) => (
+              <FunnelDataPanel key={s.id} section={s} />
+            ))}
+          </div>
+        </div>
 
-                  {/* Content */}
-                  <div className="relative z-10 px-4 md:px-5 py-3 flex items-center gap-4 md:gap-6">
-                    {/* Left: label + main value */}
-                    <div className="flex-shrink-0 min-w-0">
-                      <p className="text-[9px] font-bold uppercase tracking-[2px] mb-0.5" style={{ color: s.color }}>
-                        {s.label}
+        {/* Mobile: stacked cards */}
+        <div className="lg:hidden space-y-3">
+          {FUNNEL_SECTIONS.map((s) => (
+            <div key={s.id} className="dash-card overflow-visible" style={{ borderLeftWidth: 3, borderLeftColor: s.color }}>
+              <div className="p-4">
+                <p className="text-[11px] font-extrabold uppercase tracking-[2px] mb-3" style={{ color: s.color }}>
+                  {s.label}
+                </p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  {s.metrics.map((m) => (
+                    <div key={m.label}>
+                      <p className="text-[9px] text-text-muted uppercase tracking-wider">{m.label}</p>
+                      <p className={cn('text-[18px] font-extrabold', m.highlight ? 'text-text-primary' : 'text-text-secondary')}>
+                        {m.value}
                       </p>
-                      <p className="text-[20px] md:text-[24px] font-extrabold text-text-primary leading-none tracking-tight">
-                        {s.mainValue}
-                      </p>
-                      <p className="text-[9px] text-text-muted mt-0.5">{s.mainLabel}</p>
                     </div>
-
-                    {/* Right: secondary metrics */}
-                    <div className="flex-1 flex flex-wrap items-center justify-end gap-x-4 md:gap-x-6 gap-y-1">
-                      {s.metrics.map((m) => (
-                        <div key={m.label} className="text-right">
-                          <p className="text-[8px] md:text-[9px] text-text-muted uppercase tracking-wider">{m.label}</p>
-                          <p className="text-[13px] md:text-[15px] font-bold text-text-secondary">{m.value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  ))}
                 </div>
-
-                {/* Connector arrow between sections */}
-                {i < FUNNEL_SECTIONS.length - 1 && (
-                  <div className="flex flex-col items-center py-1">
-                    <div className="w-px h-2" style={{ backgroundColor: `color-mix(in srgb, ${s.color} 30%, transparent)` }} />
-                    <svg width="8" height="5" viewBox="0 0 8 5">
-                      <path d="M0 0 L4 5 L8 0" fill={`color-mix(in srgb, ${s.color} 30%, transparent)`} />
-                    </svg>
-                  </div>
-                )}
               </div>
             </div>
           ))}
